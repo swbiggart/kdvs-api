@@ -36,11 +36,7 @@ var KDVS = {
     });
   },
   news: {
-    response: function(req, res, body){
-      KDVS.jsdom(req, res, body, function(req, res, err, window ){
-        res.send(JSON.stringify(KDVS.news.extract(window))); 
-      });
-    },
+
     get: function(req, res){
       KDVS.news.request(req, res);
     },
@@ -52,6 +48,8 @@ var KDVS = {
       var $ = window.jQuery;
       var news = new Array();
       var news_dom = $('#content-content > div').children('div.view-content');
+      
+      //maybe do this with an _und.map iterator
       news_dom.children().each(function(index){
         news[index] = {
           "title": $(this).find('h2.title').text(),
@@ -59,7 +57,12 @@ var KDVS = {
         };    
       });
       return news;
-    }
+    },
+    response: function(req, res, body){
+      KDVS.jsdom(req, res, body, function(req, res, err, window ){
+        res.send(JSON.stringify(KDVS.news.extract(window))); 
+      });
+    },
   },
   schedule: {
     get: function(req, res){
@@ -71,7 +74,7 @@ var KDVS = {
     },
     response: function(req, res, body){
       res.send(body); 
-    }
+    },
   },
   show: {
     get: function(req, res){
@@ -86,14 +89,9 @@ var KDVS = {
         return show.show_id == req.params.id;
       });
       res.send(JSON.stringify(show));
-    }
+    },
   },
   playlist: {
-    response: function(req, res, body){
-      KDVS.jsdom(req, res, body, function(req, res, err, window ){
-        res.send(JSON.stringify(KDVS.playlist.extract(window))); 
-      });
-    },
     get: function(req, res){
       KDVS.playlist.request(req, res);
     },
@@ -103,28 +101,79 @@ var KDVS = {
     },
     extract: function(window){
       var $ = window.jQuery;
+      
+      var show = {};
+      
+      //grab the show comments but be sure not to include image (which, isn't working)
+      var comments = $('#show_info_right > p:not(:contains(img))').remove('img');
+      show.comments = comments.html();
+      show.image_url = $('img', comments).attr('src');
+      
+      
+      
       var playlist = new Array();
-      var tracks = $('table tr:has(td)');
-      //replace this with a nice _und map function
-      tracks.each(function(track_num){
+      var table = ['track', 'artist', 'song', 'album', 'label', 'comments'];
+      var tracks = $('table tr:has(td)'); //grab all rows from the table (except header)
+      //replace this with a nice _und map function perhaps?
+      tracks.each(function(n){
         row = $('td', this);
-        if(row.size() == 1){ //airbreak
-          playlist[track_num] = {airbreak: true};
+        if(row.size() == 1){ //airbreaks only have one td (with a colspan='6')
+          playlist[n] = {airbreak: true};
         } else { //track
-          //this could be done with a nice _und function too, mapping key => index
-          playlist[track_num] = {
-            track: row.eq(0).text().trim(),
-            artist: row.eq(1).text().trim(),
-            song: row.eq(2).text().trim(),
-            album: row.eq(3).text().trim(),
-            label: row.eq(4).text().trim(),
-            comments: row.eq(5).text().trim(),
-            airbreak: false
-          };
+          //this could be done with a nice _und map or reduce function I think
+          playlist[n] = {};
+          for(i in table){
+            playlist[n][table[i]] = row.eq(i).text().trim();
+          }
+          playlist[n]['airbreak'] = false;
         }
       });
-      return playlist;
-    }
+      show.playlist = playlist
+      return show;
+    },
+    response: function(req, res, body){
+      KDVS.jsdom(req, res, body, function(req, res, err, window ){
+        res.send(JSON.stringify(KDVS.playlist.extract(window))); 
+      });
+    },
+  },
+  history: {
+    get: function(req, res){
+      KDVS.history.request(req, res);
+    },
+    request: function(req, res){
+      var uri = KDVS.url + '/show-history/' + req.params.show_id;
+      KDVS.request(uri, req, res, KDVS.history.response);      
+    },
+    extract: function(window){
+      var $ = window.jQuery;
+      
+      var show = {};
+      
+      var history = new Array();
+      var shows = $('table tr:has(td)'); //grab all rows from the table (except header)
+      //replace this with a nice _und map function perhaps?
+      shows.each(function(n){
+        row = $('td', this);
+        
+        date_time = row.eq(0).text().split('@');
+        comments = row.eq(1).html(); //we need to remove the View PLaylist link in the H4
+        history[n] = {
+          day: $.trim(date_time[0]),
+          time: $.trim(date_time[1]),
+          comments: comments, //get html of comments, and remove H4
+          image_url: row.eq(2).children('img').attr('src')
+        }
+        
+      });
+      show.history = history;
+      return show;
+    },
+    response: function(req, res, body){
+      KDVS.jsdom(req, res, body, function(req, res, err, window ){
+        res.send(JSON.stringify(KDVS.history.extract(window))); 
+      });
+    },
   },
 }
 
@@ -137,6 +186,8 @@ app.get('/', KDVS.news.get);
 app.get('/schedule', KDVS.schedule.get);
 app.get('/show/:id', KDVS.show.get);
 app.get('/show/:show_id/:date', KDVS.playlist.get);
+app.get('/history/:show_id/', KDVS.history.get);
+
 
 var port = process.env.PORT || 3000;
 app.listen(port, function() {
