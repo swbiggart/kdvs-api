@@ -8,28 +8,42 @@ var express = require('express'),
     
 var KDVS = {
   url: "http://kdvs.org",
-  request: function(command, req, res){
-    var uri = KDVS.url + command;
-    request({ uri: uri  }, function (error, response, body) {
-      if (error && response.statusCode !== 200) {
-        console.log('Error when contacting ' + uri)
-      };
-      jsdom.env({
-        html: body,
-        scripts: [jquery_url],
-        done: function (err, window) {
-          res.send(JSON.stringify(KDVS.news.extract(window)));
-        }
-      });
+  library_url: "http://library.kdvs.org",
+  jsdom: function(body, req, res, callback){
+    jsdom.env({
+      html: body,
+      scripts: [jquery_url],
+      done: function(err, window){
+        return callback(err, window, res)
+      }
+    });
+  },
+  request_callback: function (error, response, body, req, res, callback) {
+    if (error) {
+      if( response.statusCode !== 200){
+        console.log('Error when contacting ' + uri);
+      } else {
+        console.log('request error: ' + error);
+      }
+    };
+    KDVS.jsdom(body, req, res, callback);
+  },
+  request: function(uri, req, res, callback){
+    console.log('requesting ' + uri);
+    request({ uri: uri  }, function(error, response, body){
+      KDVS.request_callback(error, response, body, req, res, callback);
     });
   },
   news: {
-    command: '/',
+    dom_callback: function(err, window, res){
+      res.send(JSON.stringify(KDVS.news.extract(window))); 
+    },
     get: function(req, res){
       KDVS.news.request(req, res);
     },
     request: function(req, res){
-      KDVS.request(KDVS.news.command, req, res);      
+      var uri = KDVS.url + '/';
+      KDVS.request(uri, req, res, KDVS.news.dom_callback);      
     },
     extract: function(window){
       var $ = window.jQuery;
@@ -43,15 +57,30 @@ var KDVS = {
       });
       return news;
     }
+  },
+  schedule: {
+    response: function(err, window, res){
+      res.send(JSON.stringify(window)); 
+    },
+    get: function(req, res){
+      KDVS.schedule.request(req, res);
+    },
+    request: function(req, res){
+      var uri = KDVS.library_url + '/ajax/streamingScheduleJSON';
+      
+      KDVS.request(uri, req, res, KDVS.schedule.response);      
+    },
   }
+  
 }
 
 
 app.use(express.logger());
 app.use(express.errorHandler({ showStack: true, dumpExceptions: true }));
 
-
+app.get('/schedule/', KDVS.schedule.get);
 app.get('/', KDVS.news.get);
+
 
 var port = process.env.PORT || 3000;
 app.listen(port, function() {
