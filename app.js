@@ -9,12 +9,12 @@ var express = require('express'),
 var KDVS = {
   url: "http://kdvs.org",
   library_url: "http://library.kdvs.org",
-  jsdom: function(body, req, res, callback){
+  jsdom: function(req, res, body, callback){
     jsdom.env({
       html: body,
       scripts: [jquery_url],
       done: function(err, window){
-        return callback(err, window, res)
+        return callback(req, res, err, window)
       }
     });
   },
@@ -26,7 +26,7 @@ var KDVS = {
         console.log('request error: ' + error);
       }
     };
-    KDVS.jsdom(body, req, res, callback);
+    callback(req, res, body);
   },
   request: function(uri, req, res, callback){
     console.log('requesting ' + uri);
@@ -35,15 +35,17 @@ var KDVS = {
     });
   },
   news: {
-    dom_callback: function(err, window, res){
-      res.send(JSON.stringify(KDVS.news.extract(window))); 
+    response: function(req, res, body){
+      KDVS.jsdom(req, res, body, function(req, res, err, window ){
+        res.send(JSON.stringify(KDVS.news.extract(window))); 
+      });
     },
     get: function(req, res){
       KDVS.news.request(req, res);
     },
     request: function(req, res){
       var uri = KDVS.url + '/';
-      KDVS.request(uri, req, res, KDVS.news.dom_callback);      
+      KDVS.request(uri, req, res, KDVS.news.response);      
     },
     extract: function(window){
       var $ = window.jQuery;
@@ -59,8 +61,8 @@ var KDVS = {
     }
   },
   schedule: {
-    response: function(err, window, res){
-      res.send(JSON.stringify(window)); 
+    response: function(req, res, body){
+      res.send(body); 
     },
     get: function(req, res){
       KDVS.schedule.request(req, res);
