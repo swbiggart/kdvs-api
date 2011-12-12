@@ -71,15 +71,16 @@ scrAPI = {
   get: function(uri, res, callback){
     console.log('getting');
     scrAPI.request_http(uri, function(body){
-      scrAPI.response(body, res, scrAPI.extract);
+      scrAPI.response(body, res, callback);
     });
   }
 };
 
 
 KDVS = {
+  url: 'http://kdvs.org',
   news: function(req, res){
-    var uri = 'http://kdvs.org/'
+    var uri = KDVS.url + '/'
     scrAPI.get(uri, res, function(window){
       var $ = window.jQuery;
       var news = new Array();
@@ -94,6 +95,69 @@ KDVS = {
       });
       return news;
     });
+  },
+  playlist: function(req, res){
+    var uri = KDVS.url + '/show-info/' + req.params.show_id + '?date=' + req.params.date;
+    scrAPI.get(uri, res, function(window){
+      var $ = window.jQuery;
+    
+      var show = {};
+    
+      //grab the show comments but be sure not to include image (which, isn't working)
+      var comments = $('#show_info_right > p:not(:contains(img))').remove('img');
+      show.comments = comments.html();
+      show.image_url = $('img', comments).attr('src');
+  
+      var playlist = new Array();
+      var table = ['track', 'artist', 'song', 'album', 'label', 'comments'];
+      var tracks = $('table tr:has(td)'); //grab all rows from the table (except header)
+      //replace this with a nice _und map function perhaps?
+      tracks.each(function(n){
+        row = $('td', this);
+        if(row.size() == 1){ //airbreaks only have one td (with a colspan='6')
+          playlist[n] = {airbreak: true};
+        } else { //track
+          //this could be done with a nice _und map or reduce function I think
+          playlist[n] = {};
+          for(i in table){
+            playlist[n][table[i]] = row.eq(i).text().trim();
+          }
+          playlist[n]['airbreak'] = false;
+        }
+      });
+      show.playlist = playlist
+      return show;
+    });
+  },
+  history: function(req, res){
+    var uri = KDVS.url + '/show-history/' + req.params.show_id;
+    scrAPI.get(uri, res, function(window){
+      var $ = window.jQuery;
+      
+      var show = {};
+      
+      var history = new Array();
+      var shows = $('table tr:has(td)'); //grab all rows from the table (except header)
+      //replace this with a nice _und map function perhaps?
+      shows.each(function(n){
+        row = $('td', this);
+        
+        date_time = row.eq(0).text().split('@');
+        comments = row.eq(1).html(); 
+        //we need to remove the View PLaylist link in the H4
+        
+        
+        history[n] = {
+          day: $.trim(date_time[0]),
+          time: $.trim(date_time[1]),
+          comments: comments, //get html of comments, and remove H4
+          image_url: row.eq(2).children('img').attr('src')
+        }
+        
+      });
+      show.history = history;
+      return show;
+    }); 
   }
 }
 
@@ -102,12 +166,12 @@ app.use(express.errorHandler({ showStack: true, dumpExceptions: true }));
 
 
 app.get('/', KDVS.news);
-/*
-app.get('/schedule', KDVS.schedule.get);
-app.get('/show/:id', KDVS.show.get);
-app.get('/show/:show_id/:date', KDVS.playlist.get);
-app.get('/history/:show_id/', KDVS.history.get);
-*/
+
+//app.get('/schedule', KDVS.schedule.get);
+//app.get('/show/:id', KDVS.show.get);
+app.get('/show/:show_id/:date', KDVS.playlist);
+app.get('/history/:show_id/', KDVS.history);
+
 
 var port = process.env.PORT || 3000;
 app.listen(port, function() {

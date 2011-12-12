@@ -108,9 +108,7 @@ var KDVS = {
       var comments = $('#show_info_right > p:not(:contains(img))').remove('img');
       show.comments = comments.html();
       show.image_url = $('img', comments).attr('src');
-      
-      
-      
+    
       var playlist = new Array();
       var table = ['track', 'artist', 'song', 'album', 'label', 'comments'];
       var tracks = $('table tr:has(td)'); //grab all rows from the table (except header)
