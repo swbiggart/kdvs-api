@@ -49,14 +49,14 @@ scrAPI = {
     return news;
   },
   
-  response: function(body, res, callback){
+  response: function(body,callback){
     console.log('response: ');
     jsdom.env({
       html: body,
       scripts: [jquery_url],
       done: function(err, window){
         console.log('jsdom done');
-        res.send(JSON.stringify(callback(window))); 
+        callback(window); 
       }
     });
   },
@@ -68,10 +68,10 @@ scrAPI = {
       scrAPI.response(body, res, scrAPI.extract);
     });
   },*/
-  get: function(uri, res, callback){
+  get: function(uri, callback){
     console.log('getting');
     scrAPI.request_http(uri, function(body){
-      scrAPI.response(body, res, callback);
+      scrAPI.response(body, callback);
     });
   }
 };
@@ -81,7 +81,7 @@ KDVS = {
   url: 'http://kdvs.org',
   news: function(req, res){
     var uri = KDVS.url + '/'
-    scrAPI.get(uri, res, function(window){
+    scrAPI.get(uri, function(window){
       var $ = window.jQuery;
       var news = new Array();
       var news_dom = $('#content-content > div').children('div.view-content');
@@ -93,12 +93,12 @@ KDVS = {
           "content": $(this).find('div.content').text()
         };    
       });
-      return news;
+      res.send(JSON.stringify(news));
     });
   },
   playlist: function(req, res){
     var uri = KDVS.url + '/show-info/' + req.params.show_id + '?date=' + req.params.date;
-    scrAPI.get(uri, res, function(window){
+    scrAPI.get(uri, function(window){
       var $ = window.jQuery;
     
       var show = {};
@@ -126,12 +126,12 @@ KDVS = {
         }
       });
       show.playlist = playlist
-      return show;
+      res.send(JSON.stringify(show));
     });
   },
   history: function(req, res){
     var uri = KDVS.url + '/show-history/' + req.params.show_id;
-    scrAPI.get(uri, res, function(window){
+    scrAPI.get(uri, function(window){
       var $ = window.jQuery;
       
       var show = {};
@@ -146,7 +146,6 @@ KDVS = {
         comments = row.eq(1).html(); 
         //we need to remove the View PLaylist link in the H4
         
-        
         history[n] = {
           day: $.trim(date_time[0]),
           time: $.trim(date_time[1]),
@@ -156,7 +155,7 @@ KDVS = {
         
       });
       show.history = history;
-      return show;
+      res.send(JSON.stringify(show));
     }); 
   }
 }
