@@ -13,22 +13,7 @@ scrAPI = {
 
   get: function(uri, callback){
     console.log('getting');
-    scrAPI.request(uri, function(body){
-      console.log('response: ');
-      jsdom.env({
-        html: body,
-        scripts: [jquery_url],
-        done: function(err, window){
-          console.log('jsdom done');
-          callback(window); 
-        }
-      });
-    });
-  },
-  request: function(uri, callback){
-    console.log('requesting ' + uri);
-    request({ uri: uri  }, function(error, response, body){
-      console.log('request_callback:');
+    request({ uri: uri }, function(error, response, body){
       if (error) {
         if( response.statusCode !== 200){
           console.log('Error when contacting ' + uri);
@@ -36,7 +21,13 @@ scrAPI = {
           console.log('request error: ' + error);
         }
       };
-      callback(body);
+      jsdom.env({
+        html: body,
+        scripts: [jquery_url],
+        done: function(err, window){
+          callback(window); 
+        }
+      });
     });
   }
 };
