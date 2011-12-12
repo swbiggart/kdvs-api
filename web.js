@@ -7,37 +7,41 @@ var request = require('request'),
     _und = require('underscore'),
     app = express.createServer();
 
-scrAPI = {
-  url: 'http://kdvs.org',
-  library_url: 'http://library.kdvs.org',
 
-  get: function(uri, callback){
-    console.log('getting');
-    request({ uri: uri }, function(error, response, body){
-      if (error) {
-        if( response.statusCode !== 200){
-          console.log('Error when contacting ' + uri);
-        } else {
-          console.log('request error: ' + error);
-        }
-      };
-      jsdom.env({
-        html: body,
-        scripts: [jquery_url],
-        done: function(err, window){
-          callback(window); 
-        }
-      });
-    });
-  }
-};
-
+function scrAPI(uri, callback, raw){
+  //if raw paramater passed, and true, callback on raw body
+  raw = typeof(raw) != 'undefined' ? raw : false;
+  
+  console.log('requesting: ' + uri);
+  
+  request({ uri: uri }, function(error, response, body){
+    if (error) {
+      if( response.statusCode !== 200){
+        console.log('Error when contacting ' + uri);
+      } else {
+        console.log('request error: ' + error);
+      }
+    } else {
+      if(!raw){ //parse the dom and attach jQuery ($)
+        jsdom.env({
+          html: body,
+          scripts: [jquery_url],
+          done: function(err, window){ callback(window); }
+        });
+      } else { //no dom to parse, probably native JSON or XML
+        callback(body);
+      }
+    }
+  });
+}
 
 KDVS = {
   url: 'http://kdvs.org',
+  library_url: 'http://library.kdvs.org',
+  
   news: function(req, res){
     var uri = KDVS.url + '/'
-    scrAPI.get(uri, function(window){
+    scrAPI(uri, function(window){
       var $ = window.jQuery;
       var news = new Array();
       var news_dom = $('#content-content > div').children('div.view-content');
@@ -52,11 +56,26 @@ KDVS = {
       res.send(JSON.stringify(news));
     });
   },
+  schedule: function(req, res){
+    var uri = KDVS.library_url + '/ajax/streamingScheduleJSON';
+    var raw = true;
+    scrAPI(uri, function(body){res.send(body);}, raw);
+  },
+  show: function(req, res){
+    var uri = KDVS.library_url + '/ajax/streamingScheduleJSON';
+    var raw = true;
+    scrAPI(uri, function(body){
+      var schedule = JSON.parse(body);
+      var show = _und.find(schedule, function(show, key){
+        return show.show_id == req.params.id;
+      });
+      res.send(JSON.stringify(show));
+    }, raw);
+  },
   playlist: function(req, res){
     var uri = KDVS.url + '/show-info/' + req.params.show_id + '?date=' + req.params.date;
-    scrAPI.get(uri, function(window){
+    scrAPI(uri, function(window){
       var $ = window.jQuery;
-    
       var show = {};
     
       //grab the show comments but be sure not to include image (which, isn't working)
@@ -87,7 +106,7 @@ KDVS = {
   },
   history: function(req, res){
     var uri = KDVS.url + '/show-history/' + req.params.show_id;
-    scrAPI.get(uri, function(window){
+    scrAPI(uri, function(window){
       var $ = window.jQuery;
       
       var show = {};
@@ -122,8 +141,8 @@ app.use(express.errorHandler({ showStack: true, dumpExceptions: true }));
 
 app.get('/', KDVS.news);
 
-//app.get('/schedule', KDVS.schedule.get);
-//app.get('/show/:id', KDVS.show.get);
+app.get('/schedule', KDVS.schedule);
+app.get('/show/:id', KDVS.show);
 app.get('/show/:show_id/:date', KDVS.playlist);
 app.get('/history/:show_id/', KDVS.history);
 
