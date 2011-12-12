@@ -7,10 +7,11 @@ var request = require('request'),
     _und = require('underscore'),
     app = express.createServer();
 
-
+//function to grab the content of a page and return either a DOM to parse
+//or the raw content (in the case of JSON, XML, etc)
 function scrAPI(uri, callback, raw){
   //if raw paramater passed, and true, callback on raw body
-  raw = typeof(raw) != 'undefined' ? raw : false;
+  raw = typeof raw != 'undefined' ? raw : false;
   
   console.log('requesting: ' + uri);
   
