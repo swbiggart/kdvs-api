@@ -6,7 +6,7 @@ var request = require('request'),
     express = require('express'),
     _und = require('underscore'),
     app = express.createServer();
-    
+
 var KDVS = {
   url: "http://kdvs.org",
   library_url: "http://library.kdvs.org",
@@ -15,7 +15,7 @@ var KDVS = {
       html: body,
       scripts: [jquery_url],
       done: function(err, window){
-        return callback(req, res, err, window)
+        return callback(req, res, err, window);
       }
     });
   },
@@ -157,7 +157,10 @@ var KDVS = {
         row = $('td', this);
         
         date_time = row.eq(0).text().split('@');
-        comments = row.eq(1).html(); //we need to remove the View PLaylist link in the H4
+        comments = row.eq(1).html(); 
+        //we need to remove the View PLaylist link in the H4
+        
+        
         history[n] = {
           day: $.trim(date_time[0]),
           time: $.trim(date_time[1]),
