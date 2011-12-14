@@ -5,7 +5,6 @@
 	  "express": "latest",
 	  "underscore": "latest",
     "jsdom": "0.2.x",
-    "apricot": "latest",
 	  "request": "latest"
   }
 }
