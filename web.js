@@ -1,20 +1,22 @@
 
+
 var jquery_url = 'http://code.jquery.com/jquery-1.5.min.js';
 
 var request = require('request'),
-    jsdom = require('jsdom')
+    jsdom = require('jsdom'),
     express = require('express'),
     _und = require('underscore'),
     app = express.createServer();
+
 
 //function to grab the content of a page and return either a DOM to parse
 //or the raw content (in the case of JSON, XML, etc)
 function scrAPI(uri, callback, raw){
   //if raw paramater passed, and true, callback on raw body
   raw = typeof raw != 'undefined' ? raw : false;
-  
+
   console.log('requesting: ' + uri);
-  
+
   request({ uri: uri }, function(error, response, body){
     if (error) {
       if( response.statusCode !== 200){
@@ -22,7 +24,7 @@ function scrAPI(uri, callback, raw){
       } else {
         console.log('request error: ' + error);
       }
-    } else {
+    } else { //no request errors
       if(!raw){ //parse the dom and attach jQuery ($)
         jsdom.env({
           html: body,
@@ -36,22 +38,22 @@ function scrAPI(uri, callback, raw){
   });
 }
 
-KDVS = {
+//KDVS API Namespace
+var KDVS = {
   url: 'http://kdvs.org',
   library_url: 'http://library.kdvs.org',
-  
+
+  //function isn't used, was just the first test I made
   news: function(req, res){
-    var uri = KDVS.url + '/'
+    var uri = KDVS.url + '/';
     scrAPI(uri, function(window){
       var $ = window.jQuery;
-      var news = new Array();
-      var news_dom = $('#content-content > div').children('div.view-content');
-    
+      var news = [];
       //maybe do this with an _und.map iterator
-      news_dom.children().each(function(index){
-        news[index] = {
+      $('.teaser-inner').each(function(i){
+        news[i] = {
           "title": $(this).find('h2.title').text(),
-          "content": $(this).find('div.content').text()
+          "content": $(this).find('div.content').html()
         };    
       });
       res.send(JSON.stringify(news));
@@ -68,7 +70,7 @@ KDVS = {
     scrAPI(uri, function(body){
       var schedule = JSON.parse(body);
       var show = _und.find(schedule, function(show, key){
-        return show.show_id == req.params.id;
+        return show.show_id == req.params.show_id;
       });
       res.send(JSON.stringify(show));
     }, raw);
@@ -78,12 +80,12 @@ KDVS = {
     scrAPI(uri, function(window){
       var $ = window.jQuery;
       var show = {};
-    
-      //grab the show comments but be sure not to include image (which, isn't working)
-      var comments = $('#show_info_right > p:not(:contains(img))').remove('img');
-      show.comments = comments.html();
+
+      //grab the show comments and extract the image
+      var comments = $('#show_info_right > p');
+      show.comments = comments.clone().find('img').remove().end().html(); 
       show.image_url = $('img', comments).attr('src');
-  
+
       var playlist = new Array();
       var table = ['track', 'artist', 'song', 'album', 'label', 'comments'];
       var tracks = $('table tr:has(td)'); //grab all rows from the table (except header)
@@ -91,7 +93,7 @@ KDVS = {
       tracks.each(function(n){
         row = $('td', this);
         if(row.size() == 1){ //airbreaks only have one td (with a colspan='6')
-          playlist[n] = {airbreak: true};
+          playlist.push({airbreak: true});
         } else { //track
           //this could be done with a nice _und map or reduce function I think
           playlist[n] = {};
@@ -105,48 +107,46 @@ KDVS = {
       res.send(JSON.stringify(show));
     });
   },
-  history: function(req, res){
-    var uri = KDVS.url + '/show-history/' + req.params.show_id;
-    scrAPI(uri, function(window){
-      var $ = window.jQuery;
-      
-      var show = {};
-      
-      var history = new Array();
-      var shows = $('table tr:has(td)'); //grab all rows from the table (except header)
-      //replace this with a nice _und map function perhaps?
-      shows.each(function(n){
-        row = $('td', this);
-        
-        date_time = row.eq(0).text().split('@');
-        comments = row.eq(1).html(); 
-        //we need to remove the View PLaylist link in the H4
-        
-        history[n] = {
-          day: $.trim(date_time[0]),
-          time: $.trim(date_time[1]),
-          comments: comments, //get html of comments, and remove H4
-          image_url: row.eq(2).children('img').attr('src')
-        }
-        
+  future: function(req, res){
+	  var uri = KDVS.url + '/show-future/' + req.params.show_id;
+	  scrAPI(uri, function(window){
+	    res.send(JSON.stringify(KDVS.parse_history(window)));
+	  });
+  },
+  past: function(req, res){
+	  var uri = KDVS.url + '/show-history/' + req.params.show_id;
+	  scrAPI(uri, function(window){
+	    res.send(JSON.stringify(KDVS.parse_history(window)));
+	  });
+  },
+  parse_history: function(window){
+    var $ = window.jQuery;
+    var history = [];
+    var shows = $('table tr'); //grab all rows from the table (except header)
+    //replace this with a nice _und map function perhaps?
+    shows.each(function(){
+      var row = $('td', this);
+      var date_time = row.eq(0).text().split('@'); //only temporary until I start caching data about shows
+      history.push({
+        day: $.trim(date_time[0]),
+        time: $.trim(date_time[1]),
+        comments: row.eq(1).clone().find('h4').remove().end().html(), 
+        image_url: row.eq(2).children('img').attr('src')
       });
-      show.history = history;
-      res.send(JSON.stringify(show));
-    }); 
+    });
+    return history; 
   }
 }
 
 app.use(express.logger());
 app.use(express.errorHandler({ showStack: true, dumpExceptions: true }));
 
-
 app.get('/', KDVS.news);
-
 app.get('/schedule', KDVS.schedule);
-app.get('/show/:id', KDVS.show);
-app.get('/show/:show_id/:date', KDVS.playlist);
-app.get('/history/:show_id/', KDVS.history);
-
+app.get('/show/:show_id', KDVS.show);
+app.get('/playlist/:show_id/:date', KDVS.playlist);
+app.get('/past/:show_id', KDVS.past);
+app.get('/future/:show_id', KDVS.future);
 
 var port = process.env.PORT || 3000;
 app.listen(port, function() {
