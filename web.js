@@ -10,7 +10,8 @@ var request = require('request'),
     app = express.createServer();
 
 //setup memcache client
-var memclient = new memcache.Client(11211, 'localhost');
+var memcache_host = process.env.MEMCACHE_SERVERS || 'localhost';
+var memclient = new memcache.Client(11211, memcache_host);
 memclient.connect();
 
 //function to grab the content of a page and return either a DOM to parse
@@ -150,20 +151,20 @@ var KDVS = {
   timeline: {
     get: {
       future: function(req, res){
-    	  var uri = KDVS.url + '/show-future/' + req.params.show_id;
-    	  var lifetime = 60;
+        var uri = KDVS.url + '/show-future/' + req.params.show_id;
+        var lifetime = 60;
         respond(req, res, uri, lifetime, KDVS.timeline.parser);
       },
       past: function(req, res){
-    	  var uri = KDVS.url + '/show-history/' + req.params.show_id;
-    	  var lifetime = 60;
+        var uri = KDVS.url + '/show-history/' + req.params.show_id;
+        var lifetime = 60;
         respond(req, res, uri, lifetime, KDVS.timeline.parser);
       },
     },
     parser: function(window){
       var $ = window.jQuery;
       var history = [];
-      var shows = $('table tr'); //grab all rows from the table (except header)
+      var shows = $('table tr'); //grab all rows from the table
       //replace this with a nice _und map function perhaps?
       shows.each(function(){
         var row = $('td', this);
@@ -171,7 +172,7 @@ var KDVS = {
         history.push({
           day: $.trim(date_time[0]),
           time: $.trim(date_time[1]),
-          comments: row.eq(1).clone().find('h4').remove().end().html(), 
+          comments: row.eq(1).clone().find('h4').remove().end().html(),
           image_url: row.eq(2).children('img').attr('src')
         });
       });
