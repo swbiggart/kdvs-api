@@ -42,7 +42,8 @@ function scrAPI(uri, callback, raw){
   });
 }
 
-function respond(req, res, uri, parser, lifetime, raw){
+function respond(req, res, uri, lifetime, parser, raw){
+  //raw argument only passed when we do not want to convert content to DOM
   raw = typeof raw != 'undefined' ? raw : false;
   
   memclient.get(uri, function(error, result){
@@ -72,7 +73,8 @@ var KDVS = {
   news: {
     get:  function(req, res){
       var uri = KDVS.url + '/';
-      respond(req, res, uri, KDVS.news.parser, 60);
+      var lifetime = 60;
+      respond(req, res, uri, lifetime, KDVS.news.parser);
     },
     parser: function(window){
       var $ = window.jQuery;
@@ -91,30 +93,29 @@ var KDVS = {
     get: function(req, res){
       var uri = KDVS.library_url + '/ajax/streamingScheduleJSON';
       var raw = true; //do not convert response to DOM
-      respond(req, res, uri, KDVS.schedule.parser, 60, raw);
-    },
-    parser: function(window){
-      return window;
-    }  
+      var lifetime = 60;
+      respond(req, res, uri, lifetime, function(body){return body;}, raw);
+    } 
   },
   show: {
     get: function(req, res){
       var uri = KDVS.library_url + '/ajax/streamingScheduleJSON';
-      var raw = true;
-      respond(req, res, uri, KDVS.schedule.parser, 60, raw);
+      var raw = true; //do not convert response to DOM
+      var lifetime = 60;
+      respond(req, res, uri, lifetime, function(body){
+        var schedule = JSON.parse(body);
+        var show = _und.find(schedule, function(show, key){
+          return show.show_id == req.params.show_id;
+        });
+        return JSON.stringify(show);
+      },raw);
     },
-    parser: function(window){
-      var schedule = JSON.parse(body);
-      var show = _und.find(schedule, function(show, key){
-        return show.show_id == req.params.show_id;
-      });
-      return JSON.stringify(show);
-    }  
   },
   playlist:{
     get: function(req, res){
       var uri = KDVS.url + '/show-info/' + req.params.show_id + '?date=' + req.params.date;
-      respond(req, res, uri, KDVS.playlist.parser, 60);
+      var lifetime = 60;
+      respond(req, res, uri, lifetime, KDVS.playlist.parser);
     },
     parser:function(window){
       var $ = window.jQuery;
@@ -150,11 +151,13 @@ var KDVS = {
     get: {
       future: function(req, res){
     	  var uri = KDVS.url + '/show-future/' + req.params.show_id;
-        respond(req, res, uri, KDVS.timeline.parser, 60);
+    	  var lifetime = 60;
+        respond(req, res, uri, lifetime, KDVS.timeline.parser);
       },
       past: function(req, res){
     	  var uri = KDVS.url + '/show-history/' + req.params.show_id;
-        respond(req, res, uri, KDVS.timeline.parser, 60);
+    	  var lifetime = 60;
+        respond(req, res, uri, lifetime, KDVS.timeline.parser);
       },
     },
     parser: function(window){
