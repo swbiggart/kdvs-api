@@ -2,9 +2,10 @@
   "name": "kdvs-api",
   "version": "0.0.1",
   "dependencies": {
-	  "express": "latest",
-	  "underscore": "latest",
+    "express": "latest",
+    "underscore": "latest",
     "jsdom": "0.2.x",
-	  "request": "latest"
+    "request": "latest",
+    "memcache": "latest"
   }
 }

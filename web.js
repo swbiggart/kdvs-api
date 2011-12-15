@@ -6,12 +6,17 @@ var request = require('request'),
     jsdom = require('jsdom'),
     express = require('express'),
     _und = require('underscore'),
+    memcache = require('memcache'),
     app = express.createServer();
 
+//setup memcache client
+var memclient = new memcache.Client(11211, 'localhost');
+memclient.connect();
 
 //function to grab the content of a page and return either a DOM to parse
 //or the raw content (in the case of JSON, XML, etc)
 function scrAPI(uri, callback, raw){
+
   //if raw paramater passed, and true, callback on raw body
   raw = typeof raw != 'undefined' ? raw : false;
 
@@ -44,9 +49,29 @@ var KDVS = {
   library_url: 'http://library.kdvs.org',
 
   //function isn't used, was just the first test I made
-  news: function(req, res){
-    var uri = KDVS.url + '/';
-    scrAPI(uri, function(window){
+  news: {
+    get:  function(req, res){
+      var uri = KDVS.url + '/';
+      var lifetime = 60; //how long before scraping reset
+      memclient.get(uri, function(error, result){
+        if(error){
+          console.log('memcache: error = ' + error);
+        }
+        if(result && result != 'NOT_STORED'){ //found in memcache
+          console.log('memcache: found '+ uri);
+          res.send(result);
+        } else { //not in memchace
+          scrAPI(uri, function(window){
+            var json = JSON.stringify(KDVS.news.parser(window));
+            memclient.set(uri, json, function(error, result){
+              console.log('memcache: stored '+ uri);
+              res.send(json);
+            }, lifetime);
+          });
+        }
+      });
+    },
+    parser: function(window){
       var $ = window.jQuery;
       var news = [];
       //maybe do this with an _und.map iterator
@@ -56,8 +81,8 @@ var KDVS = {
           "content": $(this).find('div.content').html()
         };    
       });
-      res.send(JSON.stringify(news));
-    });
+      return news;
+    }
   },
   schedule: function(req, res){
     var uri = KDVS.library_url + '/ajax/streamingScheduleJSON';
@@ -141,7 +166,7 @@ var KDVS = {
 app.use(express.logger());
 app.use(express.errorHandler({ showStack: true, dumpExceptions: true }));
 
-app.get('/', KDVS.news);
+app.get('/', KDVS.news.get);
 app.get('/schedule', KDVS.schedule);
 app.get('/show/:show_id', KDVS.show);
 app.get('/playlist/:show_id/:date', KDVS.playlist);
