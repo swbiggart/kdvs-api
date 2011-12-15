@@ -43,12 +43,37 @@ function scrAPI(uri, callback, raw){
   });
 }
 
+function respond(req, res, uri, parser, lifetime){
+  memclient.get(uri, function(error, result){
+    if(error){
+      console.log('memcache: error = ' + error);
+    }
+    if(result && result != 'NOT_STORED'){ //found in memcache
+      console.log('memcache: found '+ uri);
+      res.send(result);
+    } else { //not in memchace
+      scrAPI(uri, function(window){
+        var json = JSON.stringify(parser(window));
+        memclient.set(uri, json, function(error, result){
+          console.log('memcache: stored '+ uri);
+          res.send(json);
+        }, lifetime);
+      });
+    }
+  });
+}
+
 //KDVS API Namespace
 var KDVS = {
   url: 'http://kdvs.org',
   library_url: 'http://library.kdvs.org',
 
   //function isn't used, was just the first test I made
+  new_news: function(req, res){
+    var uri = KDVS.url + '/';
+    respond(req, res, uri, KDVS.news.parser, 60);
+  },
+  
   news: {
     get:  function(req, res){
       var uri = KDVS.url + '/';
@@ -165,6 +190,8 @@ var KDVS = {
 
 app.use(express.logger());
 app.use(express.errorHandler({ showStack: true, dumpExceptions: true }));
+
+app.get('/news', KDVS.new_news);
 
 app.get('/', KDVS.news.get);
 app.get('/schedule', KDVS.schedule);
