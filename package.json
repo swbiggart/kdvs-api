@@ -5,7 +5,9 @@
     "express": "latest",
     "underscore": "latest",
     "jsdom": "0.2.x",
+    "jquery": "latest",
     "request": "latest",
-    "memcache": "latest"
+    "hiredis": "latest",
+    "redis": "latest"
   }
 }

@@ -6,13 +6,21 @@ var request = require('request'),
     jsdom = require('jsdom'),
     express = require('express'),
     _und = require('underscore'),
-    memcache = require('memcache'),
+    jquery = require('jquery'),
+    redis = require('redis'),
     app = express.createServer();
 
-//setup memcache client
-var memcache_host = process.env.MEMCACHE_SERVERS || 'localhost';
-var memclient = new memcache.Client(11211, memcache_host);
-memclient.connect();
+//setup redis client
+var redis_host = process.env.REDIS_HOST || 'localhost';
+var redis_port = process.env.REDIS_PORT || 6379;
+var redis_password = process.env.REDIS_PASSWORD;
+var redclient = redis.createClient(redis_port, redis_host);
+if(redis_password){
+  redclient.auth(redis_password);
+}
+redclient.on("error", function (err) {
+    console.log("Error " + err);
+});
 
 //function to grab the content of a page and return either a DOM to parse
 //or the raw content (in the case of JSON, XML, etc)
@@ -47,20 +55,24 @@ function respond(req, res, uri, lifetime, parser, raw){
   //raw argument only passed when we do not want to convert content to DOM
   raw = typeof raw != 'undefined' ? raw : false;
   
-  memclient.get(uri, function(error, result){
+  redclient.hgetall(uri, function(error, result){
     if(error){
-      console.log('memcache: error = ' + error);
+      console.log('redis: error = ' + error);
     }
-    if(result && result != 'NOT_STORED'){ //found in memcache
-      console.log('memcache: found '+ uri);
-      res.send(result);
+    console.log(JSON.stringify(result));
+    
+    if(result && !jquery.isEmptyObject(result)){ //found in memcache
+      console.log('redis: found '+ uri);
+      res.send(JSON.stringify(result));
     } else { //not in memchace
       scrAPI(uri, function(window){
-        var json = parser(window);
-        memclient.set(uri, json, function(error, result){
-          console.log('memcache: stored '+ uri);
-          res.send(json);
-        }, lifetime);
+        var object = parser(window);
+        console.log(json);
+        redclient.hmset(uri, object, function(error, result){
+          console.log('redis-store-error: ' + error);
+          console.log('redis: stored '+ uri);
+          res.send(JSON.stringify(object));
+        });
       }, raw);
     }
   });
@@ -87,7 +99,7 @@ var KDVS = {
           "content": $(this).find('div.content').html()
         };    
       });
-      return JSON.stringify(news);
+      return news;
     }
   },
   schedule: {
@@ -108,7 +120,7 @@ var KDVS = {
         var show = _und.find(schedule, function(show, key){
           return show.show_id == req.params.show_id;
         });
-        return JSON.stringify(show);
+        return show;
       },raw);
     },
   },
@@ -145,7 +157,7 @@ var KDVS = {
         }
       });
       show.playlist = playlist
-      return JSON.stringify(show);
+      return show;
     }
   },
   timeline: {
@@ -176,7 +188,7 @@ var KDVS = {
           image_url: row.eq(2).children('img').attr('src')
         });
       });
-      return JSON.stringify(history); 
+      return history; 
     }
   }
 }
