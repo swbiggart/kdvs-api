@@ -11,6 +11,14 @@ var request = require('request'),
     app = express.createServer();
 
 //setup redis client
+var   redback = require('redback'),
+      rc = redis.createClient();
+
+redback.use(rc);
+
+redback = redback.createClient();
+
+/*
 var redis_host = process.env.REDIS_HOST || 'localhost';
 var redis_port = process.env.REDIS_PORT || 6379;
 var redis_password = process.env.REDIS_PASSWORD;
@@ -18,9 +26,9 @@ var redclient = redis.createClient(redis_port, redis_host);
 if(redis_password){
   redclient.auth(redis_password);
 }
-redclient.on("error", function (err) {
-    console.log("Error " + err);
-});
+//give redback control of redis client
+var redback = require('redback').use(redis);
+*/
 
 //function to grab the content of a page and return either a DOM to parse
 //or the raw content (in the case of JSON, XML, etc)
@@ -53,9 +61,10 @@ function scrAPI(uri, callback, raw){
 
 function respond(req, res, uri, lifetime, parser, raw){
   //raw argument only passed when we do not want to convert content to DOM
-  raw = typeof raw != 'undefined' ? raw : false;
+  var raw = typeof raw != 'undefined' ? raw : false;
   
-  redclient.hgetall(uri, function(error, result){
+  var hash = redback.createHash(uri);
+  hash.get(function(error, result){
     if(error){
       console.log('redis: error = ' + error);
     }
@@ -67,8 +76,8 @@ function respond(req, res, uri, lifetime, parser, raw){
     } else { //not in memchace
       scrAPI(uri, function(window){
         var object = parser(window);
-        console.log(json);
-        redclient.hmset(uri, object, function(error, result){
+        hash.expire(lifetime);
+        hash.set(object, function(error, result){
           console.log('redis-store-error: ' + error);
           console.log('redis: stored '+ uri);
           res.send(JSON.stringify(object));

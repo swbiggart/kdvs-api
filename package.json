@@ -8,6 +8,7 @@
     "jquery": "latest",
     "request": "latest",
     "hiredis": "latest",
-    "redis": "latest"
+    "redis": "latest",
+    "redback": "latest"
   }
 }
