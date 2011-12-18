@@ -7,28 +7,17 @@ var request = require('request'),
     express = require('express'),
     _und = require('underscore'),
     jquery = require('jquery'),
-    redis = require('redis'),
+    mongoose = require('mongoose'),
     app = express.createServer();
 
-//setup redis client
-var   redback = require('redback'),
-      rc = redis.createClient();
+//mongoose setup
+var mongodb_url = process.env.MONGOHQ_URL || 'mongodb://localhost/kdvs';
+mongoose.connect('mongodb://localhost/my_database');
 
-redback.use(rc);
+var Schema = mongoose.Schema,
+    ObjectId = Schema.ObjectId;
 
-redback = redback.createClient();
-
-/*
-var redis_host = process.env.REDIS_HOST || 'localhost';
-var redis_port = process.env.REDIS_PORT || 6379;
-var redis_password = process.env.REDIS_PASSWORD;
-var redclient = redis.createClient(redis_port, redis_host);
-if(redis_password){
-  redclient.auth(redis_password);
-}
-//give redback control of redis client
-var redback = require('redback').use(redis);
-*/
+require('./models.js').make(Schema, mongoose);
 
 //function to grab the content of a page and return either a DOM to parse
 //or the raw content (in the case of JSON, XML, etc)
@@ -63,23 +52,21 @@ function respond(req, res, uri, lifetime, parser, raw){
   //raw argument only passed when we do not want to convert content to DOM
   var raw = typeof raw != 'undefined' ? raw : false;
   
-  var hash = redback.createHash(uri);
-  hash.get(function(error, result){
+  var model = mongoose.model('News');
+  model.find({}, function(error, result){
     if(error){
-      console.log('redis: error = ' + error);
+      console.log('mongo: error = ' + error);
     }
-    console.log(JSON.stringify(result));
+    console.log('found: ' + result);
     
-    if(result && !jquery.isEmptyObject(result)){ //found in memcache
-      console.log('redis: found '+ uri);
-      res.send(JSON.stringify(result));
+    if(result && !jquery.isEmptyObject(result)){ //found
+      console.log('mongo: found '+ uri);
+      res.send(result);
     } else { //not in memchace
       scrAPI(uri, function(window){
         var object = parser(window);
-        hash.expire(lifetime);
-        hash.set(object, function(error, result){
-          console.log('redis-store-error: ' + error);
-          console.log('redis: stored '+ uri);
+        KDVS.news.save(object, function(error){
+          console.log('save: ' + err);
           res.send(JSON.stringify(object));
         });
       }, raw);
@@ -109,6 +96,10 @@ var KDVS = {
         };    
       });
       return news;
+    },
+    save: function(data, callback){
+      var model = mongoose.model('News');
+      model.create(data, callback);
     }
   },
   schedule: {

@@ -7,8 +7,6 @@
     "jsdom": "0.2.x",
     "jquery": "latest",
     "request": "latest",
-    "hiredis": "latest",
-    "redis": "latest",
-    "redback": "latest"
+    "mongoose": "latest"
   }
 }
