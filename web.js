@@ -12,7 +12,7 @@ var request = require('request'),
 
 //mongoose setup
 var mongodb_url = process.env.MONGOHQ_URL || 'mongodb://localhost/kdvs';
-mongoose.connect('mongodb://localhost/my_database');
+mongoose.connect(mongodb_url);
 
 var Schema = mongoose.Schema,
     ObjectId = Schema.ObjectId;
@@ -66,7 +66,7 @@ function respond(req, res, uri, lifetime, parser, raw){
       scrAPI(uri, function(window){
         var object = parser(window);
         KDVS.news.save(object, function(error){
-          console.log('save: ' + err);
+          console.log('save: ' + error);
           res.send(JSON.stringify(object));
         });
       }, raw);
