@@ -14,14 +14,13 @@ var request = require('request'),
 var mongodb_url = process.env.MONGOHQ_URL || 'mongodb://localhost/kdvs';
 mongoose.connect(mongodb_url);
 
-var Schema = mongoose.Schema,
-    ObjectId = Schema.ObjectId;
+var Schema = mongoose.Schema;
 
 require('./models.js').make(Schema, mongoose);
 
 //function to grab the content of a page and return either a DOM to parse
 //or the raw content (in the case of JSON, XML, etc)
-function scrAPI(uri, callback, raw){
+function scrAPI(uri, raw, callback){
   //if raw paramater passed, and true, callback on raw body
   raw = typeof raw != 'undefined' ? raw : false;
 
@@ -48,11 +47,13 @@ function scrAPI(uri, callback, raw){
   });
 }
 
-function respond(req, res, uri, lifetime, parser, raw){
+function respond(req, res, API, raw){
   //raw argument only passed when we do not want to convert content to DOM
   var raw = typeof raw != 'undefined' ? raw : false;
   
-  var model = mongoose.model('News');
+  var uri = API.uri(req);
+  var model = API.model;
+  
   model.find({}, function(error, result){
     if(error){
       console.log('mongo: error = ' + error);
@@ -63,13 +64,16 @@ function respond(req, res, uri, lifetime, parser, raw){
       console.log('mongo: found '+ uri);
       res.send(result);
     } else { //not in memchace
-      scrAPI(uri, function(window){
-        var object = parser(window);
-        KDVS.news.save(object, function(error){
+      scrAPI(uri, raw, function(window){
+        var object = API.parser(window);
+        model.create(object, function(error){
           console.log('save: ' + error);
-          res.send(JSON.stringify(object));
+          model.find({}, function(error, result){
+            console.log('mongo: found '+ uri +' after save');
+            res.send(result);
+          });
         });
-      }, raw);
+      });
     }
   });
 }
@@ -80,13 +84,13 @@ var KDVS = {
   library_url: 'http://library.kdvs.org',
   
   news: {
-    get:  function(req, res){
-      var uri = KDVS.url + '/';
-      var lifetime = 60;
-      respond(req, res, uri, lifetime, KDVS.news.parser);
-    },
-    parser: function(window){
-      var $ = window.jQuery;
+    model: mongoose.model('News'),
+    lifetime: 60,
+    get: function(req, res){ respond(req, res, KDVS.news); },
+    uri: function(req){ return KDVS.url + '/'; },
+    key: function(req){ return 'news'; },
+    parser: function(body){
+      var $ = body.jQuery;
       var news = [];
       //maybe do this with an _und.map iterator
       $('.teaser-inner').each(function(i){
@@ -96,33 +100,29 @@ var KDVS = {
         };    
       });
       return news;
-    },
-    save: function(data, callback){
-      var model = mongoose.model('News');
-      model.create(data, callback);
     }
   },
   schedule: {
-    get: function(req, res){
-      var uri = KDVS.library_url + '/ajax/streamingScheduleJSON';
-      var raw = true; //do not convert response to DOM
-      var lifetime = 60;
-      respond(req, res, uri, lifetime, function(body){return body;}, raw);
-    } 
+    model: mongoose.model('News'),
+    lifetime: 60,
+    get: function(req, res){ respond(req, res, KDVS.schedule, true); },
+    uri: function(req){ return KDVS.library_url + '/ajax/streamingScheduleJSON'; },
+    key: function(req){ return 'schedule'; },
+    parser: function(body){return body;} 
   },
   show: {
-    get: function(req, res){
-      var uri = KDVS.library_url + '/ajax/streamingScheduleJSON';
-      var raw = true; //do not convert response to DOM
-      var lifetime = 60;
-      respond(req, res, uri, lifetime, function(body){
-        var schedule = JSON.parse(body);
-        var show = _und.find(schedule, function(show, key){
-          return show.show_id == req.params.show_id;
-        });
-        return show;
-      },raw);
-    },
+    model: mongoose.model('Show'),
+    lifetime: 60,
+    get: function(req, res){ respond(req, res, KDVS.show, true); },
+    uri: function(req){ return KDVS.library_url + '/ajax/streamingScheduleJSON'; },
+    key: function(req){ return 'show'; },
+    parser: function(body){
+      var schedule = JSON.parse(body);
+      var show = _und.find(schedule, function(show, key){
+        return show.show_id == req.params.show_id;
+      });
+      return show;
+    }
   },
   playlist:{
     get: function(req, res){
@@ -161,13 +161,20 @@ var KDVS = {
     }
   },
   timeline: {
-    get: {
-      future: function(req, res){
+    future: {
+      model: mongoose.model('Show'),
+      lifetime: 60,
+      get: function(req, res){ respond(req, res, KDVS.show, true); },
+      uri: function(req){ return KDVS.library_url + '/ajax/streamingScheduleJSON'; },
+      key: function(req){ return 'show'; },
+      get: function(req, res){
         var uri = KDVS.url + '/show-future/' + req.params.show_id;
         var lifetime = 60;
         respond(req, res, uri, lifetime, KDVS.timeline.parser);
       },
-      past: function(req, res){
+    },
+    past:{
+      get: function(req, res){
         var uri = KDVS.url + '/show-history/' + req.params.show_id;
         var lifetime = 60;
         respond(req, res, uri, lifetime, KDVS.timeline.parser);

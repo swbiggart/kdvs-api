@@ -6,13 +6,15 @@ function make(Schema, mongoose) {
   var News = new Schema({
     id            : ObjectId,
     title         : String,
-    content       : String    
+    content       : String,
+    cache_date    : {type: Date, default: Date}
   });
   mongoose.model('News', News);
   
   var DJs = new Schema({
     id            : ObjectId,
-    name          : String
+    name          : String,
+    cache_date    : Date
   });
 
   var Show = new Schema({
@@ -25,6 +27,7 @@ function make(Schema, mongoose) {
     end_hour      : Number,
     start_min     : Number,
     end_min       : Number,
+    cache_date    : Date
   });
 
   var Track = new Schema({
@@ -34,7 +37,8 @@ function make(Schema, mongoose) {
     song          : String,
     album         : String,
     label         : String,
-    comments      : String
+    comments      : String,
+    cache_date    : Date
   });
 
   var Playlist = new Schema({
@@ -43,7 +47,8 @@ function make(Schema, mongoose) {
     description   : String,
     image_url     : String,
     image_cache   : String,
-    tracks        : [Track]
+    tracks        : [Track],
+    cache_date    : Date
 
   });
 
@@ -52,7 +57,8 @@ function make(Schema, mongoose) {
     start_date    : Date,
     end_date      : Date,
     title         : String,
-    shows         : [Show]
+    shows         : [Show],
+    cache_date    : Date
   });
   
 }
