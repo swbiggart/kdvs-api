@@ -78,10 +78,9 @@ function respond(req, res, uri, lifetime, parser, raw){
       scrAPI(uri, function(window){
         var object = parser(window);
         var json = JSON.stringify(object);
-        model.expire(uri, lifetime);
-        model.set(uri, json, function(error, result){
+        model.set(uri, json, lifetime, function(error, result){
           console.log('redis-store-error: ' + error);
-          console.log('redis: stored '+ uri);
+          console.log('redis: stored '+ uri + ' expiring in ' + lifetime + ' seconds');
           res.send(json);
         });
       }, raw);
