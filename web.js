@@ -14,9 +14,13 @@ var request = require('request'),
 //setup redis client
 var redis_password = process.env.REDIS_PASSWORD;
 if (process.env.REDISTOGO_URL) {
-  var rtg   = require("url").parse(process.env.REDISTOGO_URL);
-  var rc = redis.createClient(rtg.port, rtg.hostname);
-  rc.auth(rtg.auth.split(":")[1]);
+  var rtg = require("url").parse(process.env.REDISTOGO_URL);
+  var redis_port = rtg.port;
+  var redis_host = rtg.hostname;
+  var redis_pass = rtg.auth.split(":")[1];
+  var rc = redis.createClient(redis_port, redis_host);
+  rc.auth(redis_pass);
+  console.log('connected to redis with: ' + redis_pass + '-> ' + redis_host + ':' + redis_port);
 } else {
   var rc = redis.createClient();
 }
