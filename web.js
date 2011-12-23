@@ -25,8 +25,8 @@ if (process.env.REDISTOGO_URL) {
   var rc = redis.createClient();
 }
 
-redback.use(rc);
-redback = redback.createClient();
+redback = redback.use(rc);
+//redback = redback.createClient();
 
 //function to grab the content of a page and return either a DOM to parse
 //or the raw content (in the case of JSON, XML, etc)
