@@ -14,21 +14,17 @@ var request = require('request'),
 var   redback = require('redback'),
       rc = redis.createClient();
 
-redback.use(rc);
-
-redback = redback.createClient();
-
-/*
 var redis_host = process.env.REDIS_HOST || 'localhost';
 var redis_port = process.env.REDIS_PORT || 6379;
 var redis_password = process.env.REDIS_PASSWORD;
-var redclient = redis.createClient(redis_port, redis_host);
+
+var rc = redis.createClient(redis_port, redis_host);
 if(redis_password){
-  redclient.auth(redis_password);
+  rc.auth(redis_password);
 }
-//give redback control of redis client
-var redback = require('redback').use(redis);
-*/
+
+redback.use(rc);
+redback = redback.createClient();
 
 //function to grab the content of a page and return either a DOM to parse
 //or the raw content (in the case of JSON, XML, etc)
@@ -71,7 +67,7 @@ function respond(req, res, uri, lifetime, parser, raw){
     if(error){
       console.log('redis: error = ' + error);
     }
-    console.log('redis result: ' + JSON.stringify(result));
+    //console.log('redis result: ' + JSON.stringify(result));
     
     if(result && !jquery.isEmptyObject(result)){ //found in memcache
       console.log('redis: found '+ uri);
