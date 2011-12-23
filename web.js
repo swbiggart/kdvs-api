@@ -175,18 +175,21 @@ var KDVS = {
       var playlist = [];
       var table = ['track', 'artist', 'song', 'album', 'label', 'comments'];
       var tracks = $('table tr:has(td)'); //grab all rows from the table (except header)
+      var airbreaks = 0;
       //replace this with a nice _ map function perhaps?
-      tracks.each(function(n){
+      tracks.each(function(row_num){
         row = $('td', this);
-        if(row.size() == 1){ //airbreaks only have one td (with a colspan='6')
-          playlist.push({airbreak: true});
+        var n = row_num - airbreaks;
+        if(row.size() == 1 && n > 0){ //airbreaks only have one td (with a colspan='6')
+          playlist[n-1]['airbreak_after'] = true;
+          airbreaks++;
         } else { //track
           //this could be done with a nice _ map or reduce function I think
           playlist[n] = {};
           for(i in table){
             playlist[n][table[i]] = row.eq(i).text().trim();
           }
-          playlist[n]['airbreak'] = false;
+          playlist[n]['airbreak_after'] = false;
         }
       });
       show.playlist = playlist
