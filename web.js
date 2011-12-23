@@ -8,19 +8,17 @@ var request = require('request'),
     _und = require('underscore'),
     jquery = require('jquery'),
     redis = require('redis'),
+    redback = require('redback'),
     app = express.createServer();
 
 //setup redis client
-var   redback = require('redback'),
-      rc = redis.createClient();
-
-var redis_host = process.env.REDIS_HOST || 'localhost';
-var redis_port = process.env.REDIS_PORT || 6379;
 var redis_password = process.env.REDIS_PASSWORD;
-
-var rc = redis.createClient(redis_port, redis_host);
-if(redis_password){
-  rc.auth(redis_password);
+if (process.env.REDISTOGO_URL) {
+  var rtg   = require("url").parse(process.env.REDISTOGO_URL);
+  var rc = redis.createClient(rtg.port, rtg.hostname);
+  rc.auth(rtg.auth.split(":")[1]);
+} else {
+  var rc = redis.createClient();
 }
 
 redback.use(rc);
