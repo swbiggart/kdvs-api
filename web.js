@@ -5,7 +5,7 @@ var jquery_url = 'http://code.jquery.com/jquery-1.5.min.js';
 var request = require('request'),
     jsdom = require('jsdom'),
     express = require('express'),
-    _und = require('underscore'),
+    _ = require('underscore'),
     jquery = require('jquery'),
     redis = require('redis'),
     redback = require('redback'),
@@ -102,7 +102,7 @@ var KDVS = {
     parser: function(window){
       var $ = window.jQuery;
       var news = [];
-      //maybe do this with an _und.map iterator
+      //maybe do this with an _.map iterator
       $('.teaser-inner').each(function(i){
         news[i] = {
           "title": $(this).find('h2.title').text(),
@@ -127,7 +127,7 @@ var KDVS = {
       var lifetime = 60;
       respond(req, res, uri, lifetime, function(body){
         var schedule = JSON.parse(body);
-        var show = _und.find(schedule, function(show, key){
+        var show = _.find(schedule, function(show, key){
           return show.show_id == req.params.show_id;
         });
         return show;
@@ -152,13 +152,13 @@ var KDVS = {
       var playlist = new Array();
       var table = ['track', 'artist', 'song', 'album', 'label', 'comments'];
       var tracks = $('table tr:has(td)'); //grab all rows from the table (except header)
-      //replace this with a nice _und map function perhaps?
+      //replace this with a nice _ map function perhaps?
       tracks.each(function(n){
         row = $('td', this);
         if(row.size() == 1){ //airbreaks only have one td (with a colspan='6')
           playlist.push({airbreak: true});
         } else { //track
-          //this could be done with a nice _und map or reduce function I think
+          //this could be done with a nice _ map or reduce function I think
           playlist[n] = {};
           for(i in table){
             playlist[n][table[i]] = row.eq(i).text().trim();
@@ -187,7 +187,7 @@ var KDVS = {
       var $ = window.jQuery;
       var history = [];
       var shows = $('table tr'); //grab all rows from the table
-      //replace this with a nice _und map function perhaps?
+      //replace this with a nice _ map function perhaps?
       shows.each(function(){
         var row = $('td', this);
         var date_time = row.eq(0).text().split('@'); //only temporary until I start caching data about shows
