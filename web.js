@@ -154,19 +154,25 @@ var KDVS = {
       show.description = description.text();
       
       var genres = $('#show_info_left').clone().find('h3, h4, a, p, b').remove().end();
-      show.genres = $.trim(genres.text());
-      /*
+      show.genres = [];
       _(genres.text().split(',')).each(function(g){
         show.genres.push($.trim(g));
-      });*/
+      });
       
-
+      //grab date and time
+      
+      var date_and_time = $('#show_info_right h4:first').text();
+      var start_of_datetime = 20; //number of characters of 'Show description for'
+      var date_time = date_and_time.substring(start_of_datetime).split('@');
+      show.date = $.trim(date_time[0]);
+      show.time = $.trim(date_time[1]);
+      
       //grab the show comments and extract the image
       var comments = $('#show_info_right > p');
       show.comments = comments.clone().find('img').remove().end().html(); 
       show.image_url = $('img', comments).attr('src');
 
-      var playlist = new Array();
+      var playlist = [];
       var table = ['track', 'artist', 'song', 'album', 'label', 'comments'];
       var tracks = $('table tr:has(td)'); //grab all rows from the table (except header)
       //replace this with a nice _ map function perhaps?
