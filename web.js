@@ -144,6 +144,23 @@ var KDVS = {
       var $ = window.jQuery;
       var show = {};
 
+      var djs = $('#show_info_left b');
+      show.djs = [];
+      djs.each(function(){
+        show.djs.push($(this).text());
+      });
+
+      var description = $('#show_info_left p');
+      show.description = description.text();
+      
+      var genres = $('#show_info_left').clone().find('h3, h4, a, p, b').remove().end();
+      show.genres = $.trim(genres.text());
+      /*
+      _(genres.text().split(',')).each(function(g){
+        show.genres.push($.trim(g));
+      });*/
+      
+
       //grab the show comments and extract the image
       var comments = $('#show_info_right > p');
       show.comments = comments.clone().find('img').remove().end().html(); 
