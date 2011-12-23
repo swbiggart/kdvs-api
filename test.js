@@ -1,6 +1,16 @@
+
+
 var redis = require('redis'),
-      redback = require('redback'),
-      rc = redis.createClient();
+      redback = require('redback');
+
+
+var redis_host = process.env.REDIS_HOST || 'localhost';
+var redis_port = process.env.REDIS_PORT || 6379;
+var redis_password = process.env.REDIS_PASSWORD;
+var rc = redis.createClient(redis_port, redis_host);
+if(redis_password){
+  redclient.auth(redis_password);
+}
 
 redback.use(rc);
 

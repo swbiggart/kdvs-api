@@ -1,5 +1,5 @@
 
-
+var redis_namespace = 'kdvs';
 var jquery_url = 'http://code.jquery.com/jquery-1.5.min.js';
 
 var request = require('request'),
@@ -34,7 +34,7 @@ var redback = require('redback').use(redis);
 //or the raw content (in the case of JSON, XML, etc)
 function scrAPI(uri, callback, raw){
   //if raw paramater passed, and true, callback on raw body
-  raw = typeof raw != 'undefined' ? raw : false;
+  var raw = typeof raw != 'undefined' ? raw : false;
 
   console.log('requesting: ' + uri);
 
@@ -63,24 +63,28 @@ function respond(req, res, uri, lifetime, parser, raw){
   //raw argument only passed when we do not want to convert content to DOM
   var raw = typeof raw != 'undefined' ? raw : false;
   
-  var hash = redback.createHash(uri);
-  hash.get(function(error, result){
+  //we are always passing json
+  res.contentType('application/json');
+  
+  var model = redback.createCache(redis_namespace);
+  model.get(uri, function(error, result){
     if(error){
       console.log('redis: error = ' + error);
     }
-    console.log(JSON.stringify(result));
+    console.log('redis result: ' + JSON.stringify(result));
     
     if(result && !jquery.isEmptyObject(result)){ //found in memcache
       console.log('redis: found '+ uri);
-      res.send(JSON.stringify(result));
+      res.send(result);
     } else { //not in memchace
       scrAPI(uri, function(window){
         var object = parser(window);
-        hash.expire(lifetime);
-        hash.set(object, function(error, result){
+        var json = JSON.stringify(object);
+        model.expire(uri, lifetime);
+        model.set(uri, json, function(error, result){
           console.log('redis-store-error: ' + error);
           console.log('redis: stored '+ uri);
-          res.send(JSON.stringify(object));
+          res.send(json);
         });
       }, raw);
     }
@@ -121,7 +125,7 @@ var KDVS = {
   },
   show: {
     get: function(req, res){
-      var uri = KDVS.library_url + '/ajax/streamingScheduleJSON';
+      var uri = KDVS.library_url + '/ajax/streamingScheduleJSON' + '?show_id=' + req.params.show_id;
       var raw = true; //do not convert response to DOM
       var lifetime = 60;
       respond(req, res, uri, lifetime, function(body){
