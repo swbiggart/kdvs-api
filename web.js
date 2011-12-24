@@ -63,8 +63,7 @@ function respond(req, res, uri, lifetime, parser, raw){
   //raw argument only passed when we do not want to convert content to DOM
   var raw = typeof raw != 'undefined' ? raw : false;
   
-  //we are always passing json
-  res.contentType('application/json');
+
   
   var model = redback.createCache(redis_namespace);
   model.get(uri, function(error, result){
@@ -75,7 +74,7 @@ function respond(req, res, uri, lifetime, parser, raw){
     
     if(result && !jquery.isEmptyObject(result)){ //found in redis
       console.log('redis: found '+ uri);
-      res.send(result);
+      sendJSON(req, res, result);
     } else { //not in redis
       scrAPI(uri, function(window){
         var object = parser(window);
@@ -83,11 +82,22 @@ function respond(req, res, uri, lifetime, parser, raw){
         model.set(uri, json, lifetime, function(error, result){
           console.log('redis-store-error: ' + error);
           console.log('redis: stored '+ uri + ' expiring in ' + lifetime + ' seconds');
-          res.send(json);
+          sendJSON(req, res, json);
         });
       }, raw);
     }
   });
+}
+
+function sendJSON(req, res, json){
+  var callback = req.query['callback'];
+  if(callback){
+    res.contentType('application/javascript');
+    res.send(callback + '(' + json + ')');
+  } else {
+    res.contentType('application/json');
+    res.send(json);
+  }
 }
 
 var API = {
@@ -98,7 +108,7 @@ var API = {
       message: "Welcome to the KDVS.fm API!",
       developer_url: "http://developer.kdvs.fm"      
     }
-    res.contentType('application/json');
+    
     res.send(JSON.stringify(data));
   },
   news:  function(req, res){
@@ -111,7 +121,11 @@ var API = {
     var raw = true; //do not convert response to DOM
     var lifetime = 60;
     respond(req, res, uri, lifetime, function(body){
-      return body;
+      var old_schedule = JSON.parse(body);
+      var schedule = _.map(old_schedule, function(show, key){
+        return show; //removing key
+      });
+      return schedule;
     }, raw);
   },
   show: function(req, res){
