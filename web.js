@@ -1,14 +1,17 @@
 
 var redis_namespace = 'kdvs';
+
+//jquery script url to use with jsdom.  Seems wasteful since we require('jquery')
 var jquery_url = 'http://code.jquery.com/jquery-1.5.min.js';
 
 var request = require('request'),
     jsdom = require('jsdom'),
     express = require('express'),
-    _ = require('underscore'),
     jquery = require('jquery'),
+    _ = require('underscore'),
     redis = require('redis'),
     redback = require('redback'),
+    kdvs = require('./lib/kdvs.js'),
     app = express.createServer();
 
 //setup redis client
@@ -26,7 +29,6 @@ if (process.env.REDISTOGO_URL) {
 }
 
 redback = redback.use(rc);
-//redback = redback.createClient();
 
 //function to grab the content of a page and return either a DOM to parse
 //or the raw content (in the case of JSON, XML, etc)
@@ -44,7 +46,7 @@ function scrAPI(uri, callback, raw){
         console.log('request error: ' + error);
       }
     } else { //no request errors
-      if(!raw){ //parse the dom and attach jQuery ($)
+      if(!raw){ //parse the dom and attach jQuery 
         jsdom.env({
           html: body,
           scripts: [jquery_url],
@@ -71,10 +73,10 @@ function respond(req, res, uri, lifetime, parser, raw){
     }
     //console.log('redis result: ' + JSON.stringify(result));
     
-    if(result && !jquery.isEmptyObject(result)){ //found in memcache
+    if(result && !jquery.isEmptyObject(result)){ //found in redis
       console.log('redis: found '+ uri);
       res.send(result);
-    } else { //not in memchace
+    } else { //not in redis
       scrAPI(uri, function(window){
         var object = parser(window);
         var json = JSON.stringify(object);
@@ -88,156 +90,75 @@ function respond(req, res, uri, lifetime, parser, raw){
   });
 }
 
-//KDVS API Namespace
-var KDVS = {
+var API = {
   url: 'http://kdvs.org',
   library_url: 'http://library.kdvs.org',
-  
-  news: {
-    get:  function(req, res){
-      var uri = KDVS.url + '/';
-      var lifetime = 60;
-      respond(req, res, uri, lifetime, KDVS.news.parser);
-    },
-    parser: function(window){
-      var $ = window.jQuery;
-      var news = [];
-      //maybe do this with an _.map iterator
-      $('.teaser-inner').each(function(i){
-        news[i] = {
-          "title": $(this).find('h2.title').text(),
-          "content": $(this).find('div.content').html()
-        };    
-      });
-      return news;
+  root: function(req, res){
+    var data = {
+      message: "Welcome to the KDVS.fm API!",
+      developer_url: "http://developer.kdvs.fm"      
     }
+    res.contentType('application/json');
+    res.send(JSON.stringify(data));
   },
-  schedule: {
-    get: function(req, res){
-      var uri = KDVS.library_url + '/ajax/streamingScheduleJSON';
-      var raw = true; //do not convert response to DOM
-      var lifetime = 60;
-      respond(req, res, uri, lifetime, function(body){return body;}, raw);
-    } 
+  news:  function(req, res){
+    var uri = API.url + '/';
+    var lifetime = 60;
+    respond(req, res, uri, lifetime, kdvs.news);
   },
-  show: {
-    get: function(req, res){
-      var uri = KDVS.library_url + '/ajax/streamingScheduleJSON' + '?show_id=' + req.params.show_id;
-      var raw = true; //do not convert response to DOM
-      var lifetime = 60;
-      respond(req, res, uri, lifetime, function(body){
-        var schedule = JSON.parse(body);
-        var show = _.find(schedule, function(show, key){
-          return show.show_id == req.params.show_id;
-        });
-        return show;
-      },raw);
-    },
+  schedule: function(req, res){
+    var uri = API.library_url + '/ajax/streamingScheduleJSON';
+    var raw = true; //do not convert response to DOM
+    var lifetime = 60;
+    respond(req, res, uri, lifetime, function(body){
+      return body;
+    }, raw);
   },
-  playlist:{
-    get: function(req, res){
-      var uri = KDVS.url + '/show-info/' + req.params.show_id + '?date=' + req.params.date;
-      var lifetime = 60;
-      respond(req, res, uri, lifetime, KDVS.playlist.parser);
-    },
-    parser:function(window){
-      var $ = window.jQuery;
-      var show = {};
-
-      var djs = $('#show_info_left b');
-      show.djs = [];
-      djs.each(function(){
-        show.djs.push($(this).text());
+  show: function(req, res){
+    var uri = API.library_url + '/ajax/streamingScheduleJSON' + '?show_id=' + req.params.show_id;
+    var raw = true; //do not convert response to DOM
+    var lifetime = 60;
+    respond(req, res, uri, lifetime, function(body){
+      var schedule = JSON.parse(body);
+      var show = _.find(schedule, function(show, key){
+        return show.show_id == req.params.show_id;
       });
-
-      var description = $('#show_info_left p');
-      show.description = description.text();
-      
-      var genres = $('#show_info_left').clone().find('h3, h4, a, p, b').remove().end();
-      show.genres = [];
-      _(genres.text().split(',')).each(function(g){
-        show.genres.push($.trim(g));
-      });
-      
-      //grab date and time
-      
-      var date_and_time = $('#show_info_right h4:first').text();
-      var start_of_datetime = 20; //number of characters of 'Show description for'
-      var date_time = date_and_time.substring(start_of_datetime).split('@');
-      show.date = $.trim(date_time[0]);
-      show.time = $.trim(date_time[1]);
-      
-      //grab the show comments and extract the image
-      var comments = $('#show_info_right > p');
-      show.comments = comments.clone().find('img').remove().end().html(); 
-      show.image_url = $('img', comments).attr('src');
-
-      var playlist = [];
-      var table = ['track', 'artist', 'song', 'album', 'label', 'comments'];
-      var tracks = $('table tr:has(td)'); //grab all rows from the table (except header)
-      var airbreaks = 0;
-      //replace this with a nice _ map function perhaps?
-      tracks.each(function(row_num){
-        row = $('td', this);
-        var n = row_num - airbreaks;
-        if(row.size() == 1 && n > 0){ //airbreaks only have one td (with a colspan='6')
-          playlist[n-1]['airbreak_after'] = true;
-          airbreaks++;
-        } else { //track
-          //this could be done with a nice _ map or reduce function I think
-          playlist[n] = {};
-          for(i in table){
-            playlist[n][table[i]] = row.eq(i).text().trim();
-          }
-          playlist[n]['airbreak_after'] = false;
-        }
-      });
-      show.playlist = playlist
       return show;
-    }
+    },raw);
   },
-  timeline: {
-    get: {
-      future: function(req, res){
-        var uri = KDVS.url + '/show-future/' + req.params.show_id;
-        var lifetime = 60;
-        respond(req, res, uri, lifetime, KDVS.timeline.parser);
-      },
-      past: function(req, res){
-        var uri = KDVS.url + '/show-history/' + req.params.show_id;
-        var lifetime = 60;
-        respond(req, res, uri, lifetime, KDVS.timeline.parser);
-      },
-    },
-    parser: function(window){
-      var $ = window.jQuery;
-      var history = [];
-      var shows = $('table tr'); //grab all rows from the table
-      //replace this with a nice _ map function perhaps?
-      shows.each(function(){
-        var row = $('td', this);
-        var date_time = row.eq(0).text().split('@'); //only temporary until I start caching data about shows
-        history.push({
-          day: $.trim(date_time[0]),
-          time: $.trim(date_time[1]),
-          comments: row.eq(1).clone().find('h4').remove().end().html(),
-          image_url: row.eq(2).children('img').attr('src')
-        });
-      });
-      return history; 
-    }
-  }
+  playlist: function(req, res){
+    var uri = API.url + '/show-info/' + req.params.show_id + '?date=' + req.params.date;
+    var lifetime = 60;
+    respond(req, res, uri, lifetime, kdvs.playlist);
+  },
+  current: function(req, res){
+    var uri = API.url + '/show-info/' + req.params.show_id;
+    var lifetime = 60;
+    respond(req, res, uri, lifetime, kdvs.playlist);
+  },
+  past: function(req, res){
+    var uri = API.url + '/show-history/' + req.params.show_id;
+    var lifetime = 60;
+    respond(req, res, uri, lifetime, kdvs.timeline);
+  },
+  future: function(req, res){
+    var uri = API.url + '/show-future/' + req.params.show_id;
+    var lifetime = 60;
+    respond(req, res, uri, lifetime, kdvs.timeline);
+  },
 }
 
 app.use(express.logger());
 app.use(express.errorHandler({ showStack: true, dumpExceptions: true }));
 
-app.get('/', KDVS.news.get);
-app.get('/schedule', KDVS.schedule.get);
-app.get('/show/:show_id', KDVS.show.get);
-app.get('/playlist/:show_id/:date', KDVS.playlist.get);
-app.get('/past/:show_id', KDVS.timeline.get.past);
-app.get('/future/:show_id', KDVS.timeline.get.future);
+app.get('/', API.root);
+app.get('/news', API.news);
+app.get('/schedule', API.schedule);
+app.get('/show/:show_id([0-9]+)', API.show);
+app.get('/show/:show_id([0-9]+)/playlist/:date', API.playlist);
+app.get('/show/:show_id([0-9]+)/playlist', API.current);
+app.get('/show/:show_id([0-9]+)/past', API.past);
+app.get('/show/:show_id([0-9]+)/future', API.future);
 
 var port = process.env.PORT || 3000;
 app.listen(port, function() {
