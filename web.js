@@ -7,7 +7,7 @@ var jquery_url = 'http://code.jquery.com/jquery-1.5.min.js';
 var request = require('request'),
     jsdom = require('jsdom'),
     express = require('express'),
-    jquery = require('jquery'),
+    $ = require('jquery'),
     _ = require('underscore'),
     redis = require('redis'),
     redback = require('redback'),
@@ -72,7 +72,7 @@ function respond(req, res, uri, lifetime, parser, raw){
     }
     //console.log('redis result: ' + JSON.stringify(result));
     
-    if(result && !jquery.isEmptyObject(result)){ //found in redis
+    if(result && !$.isEmptyObject(result)){ //found in redis
       console.log('redis: found '+ uri);
       sendJSON(req, res, result);
     } else { //not in redis
@@ -122,7 +122,17 @@ var API = {
     var lifetime = 60;
     respond(req, res, uri, lifetime, function(body){
       var old_schedule = JSON.parse(body);
-      var schedule = _.map(old_schedule, function(show, key){
+      var schedule = _(old_schedule).sortBy(function(show){
+        //sorting by start time then dotw to make building schedule grid easier
+        return (show.start_hour < 10 ? '0' : '') + show.start_hour +
+          (show.start_min < 10 ? '0' : '') + show.start_min + show.dotw;
+      }).map(function(show, key){
+        //turn dj_names string into an array and trim whitespace
+        show.djs = _(show.dj_names.split('&')).map(function(dj){
+          return $.trim(dj);
+        });
+        delete show.dj_names; //remove dj_names string
+        
         return show; //removing key
       });
       return schedule;
