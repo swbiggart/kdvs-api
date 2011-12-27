@@ -35,9 +35,7 @@ redback = redback.use(rc);
 function scrAPI(uri, callback, raw){
   //if raw paramater passed, and true, callback on raw body
   var raw = typeof raw != 'undefined' ? raw : false;
-
   console.log('requesting: ' + uri);
-
   request({ uri: uri }, function(error, response, body){
     if (error) {
       if( response.statusCode !== 200){
@@ -62,9 +60,6 @@ function scrAPI(uri, callback, raw){
 function respond(req, res, uri, lifetime, parser, raw){
   //raw argument only passed when we do not want to convert content to DOM
   var raw = typeof raw != 'undefined' ? raw : false;
-  
-
-  
   var model = redback.createCache(redis_namespace);
   model.get(uri, function(error, result){
     if(error){
@@ -120,23 +115,7 @@ var API = {
     var uri = API.library_url + '/ajax/streamingScheduleJSON';
     var raw = true; //do not convert response to DOM
     var lifetime = 60;
-    respond(req, res, uri, lifetime, function(body){
-      var old_schedule = JSON.parse(body);
-      var schedule = _(old_schedule).sortBy(function(show){
-        //sorting by start time then dotw to make building schedule grid easier
-        return (show.start_hour < 10 ? '0' : '') + show.start_hour +
-          (show.start_min < 10 ? '0' : '') + show.start_min + show.dotw;
-      }).map(function(show, key){
-        //turn dj_names string into an array and trim whitespace
-        show.djs = _(show.dj_names.split('&')).map(function(dj){
-          return $.trim(dj);
-        });
-        delete show.dj_names; //remove dj_names string
-        
-        return show; //removing key
-      });
-      return schedule;
-    }, raw);
+    respond(req, res, uri, lifetime, kdvs.schedule, raw);
   },
   show: function(req, res){
     var uri = API.library_url + '/ajax/streamingScheduleJSON' + '?show_id=' + req.params.show_id;
